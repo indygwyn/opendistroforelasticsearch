@@ -5,18 +5,6 @@
 # The Inspec reference, with examples and extensive documentation, can be
 # found at http://inspec.io/docs/reference/resources/
 
-unless os.windows?
-  # This is an example test, replace with your own test.
-  describe user('root'), :skip do
-    it { should exist }
-  end
-end
-
-# This is an example test, replace it with your own test.
-describe port(80), :skip do
-  it { should_not be_listening }
-end
-
 %w(elasticsearch-6.x opendistroforelasticsearch-artifacts-repo).each do |repo|
   describe yum.repo(repo) do
     it { should be_enabled }
@@ -35,19 +23,30 @@ end
   end
 end
 
-describe 'Skipping elasticsearch checks' do
-  skip 'elasticsearch starts up too slowly for for kitchen to verify immediately after a converge'
-end
-
-describe port(5601), :skip do
+describe port(5601) do
   it { should be_listening }
 end
 
-describe port(9200), :skip do
-  it { should be_listening, retry: 60, retry_wait: 5 }
+control 'Elasticsearch Listening' do
+  only_if('uptime greater than 120') do
+    command('awk \'{printf "%d", $1}\' < /proc/uptime').stdout.to_i > 120
+  end
+
+  describe port(9200) do
+    it { should be_listening }
+  end
 end
 
-describe http('https://localhost:9200', auth: { user: 'admin', pass: 'admin' }, ssl_verify: false), :skip do
-  its('status') { should cmp 200 }
-  its('body') { should match '/elasticsearch/' }
+control 'Elasticsearch HTTP' do
+  only_if('uptime greater than 120') do
+    command('awk \'{printf "%d", $1}\' < /proc/uptime').stdout.to_i > 120
+  end
+
+  describe http('https://localhost:9200', auth: { user: 'admin', pass: 'admin' }, ssl_verify: false) do
+    its('status') { should cmp 200 }
+  end
+end
+
+describe 'Skipping elasticsearch checks' do
+  skip 'elasticsearch checks are skipped if the uptime < 120'
 end
